@@ -1,9 +1,21 @@
-# RevSci Path
+# Path
 
 A Path is an abstraction of a uri that helps with building
 isomorphic web apps. Here is a basic example:
 
+## Installation
+
+```
+npm install osh-path
+```
+
+## Narrative
+
+Example:
+
 ```js
+var Path = require('osh-path');
+
 var userPath = Path({
   pattern: '/users/<user>',
   params: {
@@ -146,3 +158,8 @@ var userPath = Path({
   }
 });
 ```
+
+
+## License
+
+MIT
