@@ -94,12 +94,28 @@ describe('Path', function() {
       }
     });
 
+    var path2 = Path({
+      pattern: '/pets/<name>',
+      params: {name: /\w+/},
+      get: [
+        function(req, res, next) {
+          expect(req.params.name).to.be.ok();
+          next();
+        },
+        function(req, res, next) {
+          expect(req.params.name).to.be.ok();
+          res.send({name: req.params.name.toUpperCase()});
+        }
+      ]
+    });
+
     var app = express();
     path.serve(app);
+    path2.serve(app);
 
     var request = supertest(app);
 
-    it('should work', function(done) {
+    it('should serve single function', function(done) {
       request.get('/users/tory')
       .end(function(err, res) {
         if (err) done(err);
@@ -108,6 +124,11 @@ describe('Path', function() {
           done();
         }
       });
+    });
+
+    it('should serve middleware array', function(done) {
+      request.get('/pets/spot')
+      .expect(200, /"name":"SPOT"/, done);
     });
   });
 });
