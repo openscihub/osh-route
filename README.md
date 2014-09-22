@@ -1,7 +1,12 @@
 # Path
 
-A Path is an abstraction of a uri that helps with building
-isomorphic web apps. Here is a basic example:
+A Path is an abstraction of a uri. Path lets you make HTTP requests on the
+server or in the browser (implemented by wrapping
+[superagent](https://github.com/visionmedia/superagent)) using parameters
+rather than a string. This helps with all-important parameter validation.
+
+Also, you get parameter validation at your express server endpoints pretty
+painlessly, too.
 
 ## Installation
 
@@ -20,6 +25,9 @@ var userPath = Path({
   pattern: '/users/<user>',
   params: {
     user: /\w+/
+  },
+  query: {
+    age: /[0-9]+/
   }
 });
 ```
@@ -35,61 +43,27 @@ Path wraps up SuperAgent, so one can make requests from the server
 and browser.
 
 ```js
-userPath.get({
-  params: {user: 'fred'}
-})
+userPath.get({user: 'fred', age: 90})
 .end(function(res) {
-  // Check out Fred's res.body...
+  // Check out Fred's res.body at 90...
 });
 ```
 
 If the `user` param doesn't match the RegExp, the request will be avoided
 completely, and a valid 404 SuperAgent response will be returned.
 
-At this point, though, there is no server. Attach http methods to the
-Path and serve them using Express. For example,
-
-```js
-var userPath = Path({
-  pattern: '/users/<user>',
-  params: {
-    user: /\w+/
-  },
-  get: function(req, res) {
-    res.send({username: req.params.user});
-  }
-});
-```
-
-(`get` can also be an array of middleware functions; just make sure to
-call `next()` in each.)
-
-To serve the path in node.js:
+Path helps you serve stuff using Express. For example, using `userPath`
+from the example above:
 
 ```js
 var app = express();
-userPath.serve(app);
-```
-
-Do not attach the middleware function(s) directly to the Path config
-object, because they'll end up in the browser bundle of your app. Use
-absolute module strings instead:
-
-```js
-var userPath = Path({
-  pattern: '/users/<user>',
-  params: {
-    user: /\w+/
-  },
-  get: __dirname + '/get',
-  post: __dirname + '/post'
+userPath.serve(app, 'get', function(req, res) {
+  res.send({
+    username: req.params.user,
+    wrinkles: Number(req.params.age) * 100
+  });
 });
 ```
-
-The above tells a client that the `GET/POST` endpoints exist (because `get` and
-`post` are truthy), and tells the server where to find the middleware when you
-call `userPath.serve(app)`.  Make sure the modules export a single middleware
-function or an array of middleware functions.
 
 That's basically it.
 

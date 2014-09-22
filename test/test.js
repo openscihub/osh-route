@@ -7,6 +7,7 @@ var supertest = require('supertest');
 describe('Path', function() {
 
   var path = Path({
+    host: 'localhost:3333',
     pattern: '/articles/<article>',
     params: {article: /[^\/]+/},
     get: true,
@@ -57,8 +58,8 @@ describe('Path', function() {
 
     it('should make a request', function(done) {
       path.get({
-        host: 'localhost:3333',
-        params: {user: 'tory', article: 'health'}
+        user: 'tory',
+        article: 'health'
       })
       .end(function(res) {
         expect(res.ok).to.be.ok();
@@ -69,13 +70,12 @@ describe('Path', function() {
     });
 
     it('should fail a request', function(done) {
-      path.post({
-        host: 'localhost:3333',
-        params: {user: 'tory', article: 'health'}
-      })
+      path.post(
+        {user: 'tory', article: 'health'}
+      )
       .end(function(res) {
         expect(res.ok).not.to.be.ok();
-        expect(res.error.message).to.match(/method/);
+        expect(res.status).to.be(404);
         done();
       });
     });
@@ -85,33 +85,104 @@ describe('Path', function() {
     });
   });
 
-  describe('serve()', function() {
+  describe('query()', function() {
+    it('should accept good query parameter', function() {
+      var path = Path({
+        pattern: '/',
+        query: {
+          tab: /^[a-z]+$/
+        }
+      });
+      expect(
+        path.query({tab: 'articles'})
+      ).to.eql(
+        {tab: 'articles'}
+      );
+    });
+
+    it('should ignore bad query parameter', function() {
+      var path = Path({
+        pattern: '/',
+        query: {
+          tab: /^[a-z]+$/
+        }
+      });
+      expect(
+        path.query({tab: 'ARTICLES'})
+      ).to.eql({});
+    });
+  });
+
+  describe('parse()', function() {
     var path = Path({
       pattern: '/users/<user>',
       params: {user: /\w+/},
-      get: function(req, res) {
-        res.send({upper: req.params.user.toUpperCase()});
-      }
+      query: {tab: /\w+/}
+    });
+
+    it('should skip bad query parameter', function(done) {
+      var app = express();
+      app.get(
+        path.regexp,
+        path.parse(),
+        function(req, res) {
+          expect(req.params.tab).to.be(undefined);
+          res.send();
+        }
+      );
+      supertest(app).get('/users/tory?tab=' + encodeURIComponent('!@#$%$'))
+      .expect(200, done);
+    });
+
+    it('should add query parameter to params', function(done) {
+      var app = express();
+      app.get(
+        path.regexp,
+        path.parse(),
+        function(req, res) {
+          expect(req.params.tab).to.be('articles');
+          res.send();
+        }
+      );
+      supertest(app).get('/users/tory?tab=articles')
+      .expect(200, done);
+    });
+
+  });
+
+  describe('serve()', function() {
+    var path = Path({
+      pattern: '/users/<user>',
+      params: {user: /\w+/}
     });
 
     var path2 = Path({
       pattern: '/pets/<name>',
-      params: {name: /\w+/},
-      get: [
-        function(req, res, next) {
-          expect(req.params.name).to.be.ok();
-          next();
-        },
-        function(req, res, next) {
-          expect(req.params.name).to.be.ok();
-          res.send({name: req.params.name.toUpperCase()});
-        }
-      ]
+      params: {name: /\w+/}
     });
 
     var app = express();
-    path.serve(app);
-    path2.serve(app);
+
+    path.serve(app, 'get', function(req, res) {
+      res.send({upper: req.params.user.toUpperCase()});
+    });
+
+    path2.serve(app, 'get',
+      function(req, res, next) {
+        expect(req.params.name).to.be.ok();
+        next();
+      },
+      function(req, res, next) {
+        expect(req.params.name).to.be.ok();
+        res.send({name: req.params.name.toUpperCase()});
+      }
+    );
+
+    path2.serve(app, 'post',
+      function(req, res) {
+        res.send({});
+      }
+    );
 
     var request = supertest(app);
 
