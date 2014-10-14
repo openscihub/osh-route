@@ -9,7 +9,7 @@ describe('Path', function() {
   var path = Path({
     host: 'localhost:3333',
     pattern: '/articles/<article>',
-    params: {article: /[^\/]+/},
+    params: {article: /\w+/},
     get: true,
     parent: {
       pattern: '/users/<user>',
@@ -29,6 +29,20 @@ describe('Path', function() {
           article: 'health'
         })
       ).to.be('/users/tory/articles/health');
+    });
+
+    it('should throw ParamError on undefined param', function() {
+      expect(function() {path.string({});}).to.throwException(
+        function(e) {
+          expect(e.message).to.match(/undefined/i);
+        }
+      );
+    });
+
+    it('should throw ParamError on invalid param', function() {
+      expect(function() {path.string({user: 'tory', article: '!@#%^'});})
+      .to
+      .throwException(/@/);
     });
   });
 
