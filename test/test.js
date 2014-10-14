@@ -114,16 +114,16 @@ describe('Path', function() {
       );
     });
 
-    it('should ignore bad query parameter', function() {
+    it('should throw on bad query parameter', function() {
       var path = Path({
         pattern: '/',
         query: {
           tab: /^[a-z]+$/
         }
       });
-      expect(
+      expect(function() {
         path.query({tab: 'ARTICLES'})
-      ).to.eql({});
+      }).to.throwException(/Invalid query parameter/);
     });
   });
 
