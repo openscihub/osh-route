@@ -39,8 +39,6 @@ var Route = Class(Hierarchy, {
     this._path = (parent._path || '') + opts.path.replace(/\/$/, '');
     this._params = merge(parent._params || {}, opts.params);
     this.host = opts.host || '';
-    this._query = opts.query || {}; // Do not inherit.
-    this.queryKeys = Object.keys(this._query).sort();
     this._compile();
   },
 
@@ -61,23 +59,24 @@ var Route = Class(Hierarchy, {
 
   validate: function(name, value) {
     if (value === undefined) return;
-    var validator = this._params[name] || this._query[name];
+    var validator = this._params[name];
     if (!validator) return;
     var valid = (
       validator instanceof RegExp ?
       validator.test(value) :
       validator(value)
     );
-    if (!valid) this.invalid[name] = value;
     return valid;
   },
 
 
-  /**
+  /*\
+   *
    *  Build the path string from parameters. If the parameters do
-   *  not fully describe the path, return undefined.
+   *  not fully describe the path, throw an error.
    *
    *  Example:
+   *
    *    var route = Route({
    *      path: '/users/<user>',
    *      params: {user: /\w+/}
@@ -87,11 +86,10 @@ var Route = Class(Hierarchy, {
    *    });
    *    route.path({user: 'tory'}); // '/api/users/tory'
    *
-   */
-    
+  \*/
+
   path: function(props) {
     props = props || {};
-    this.invalid = {};
   
     var path = this._path;
     var name;
@@ -106,10 +104,11 @@ var Route = Class(Hierarchy, {
           function() {return encodeURIComponent(value);}
         );
       }
-      else return;
+      else {
+        throw new Error('EBADPARAM: ' + name);
+      }
     }
   
-    delete this.invalid;
     return path;
   },
 
@@ -146,8 +145,6 @@ var Route = Class(Hierarchy, {
     var match = this._regexp.exec(path);
     if (!match) return;
 
-    this.invalid = {};
-
     var name;
     var value;
     var params = {};
@@ -158,7 +155,6 @@ var Route = Class(Hierarchy, {
       params[name] = value;
     }
   
-    delete this.invalid;
     return params;
   },
 
@@ -166,7 +162,7 @@ var Route = Class(Hierarchy, {
     uri = parseUri(uri);
     var params = this.params(uri.path);
     if (!params) return;
-    return merge(params, this.query(uri.queryKeys));
+    return merge(params, uri.queryKeys);
   },
   
   /**
@@ -181,15 +177,13 @@ var Route = Class(Hierarchy, {
   
   _iterQuery: function(props, fn) {
     props = props || {};
-  
-    var queryKeys = this.queryKeys;
-    var key;
-    var value;
-  
-    for (var i = 0, len = queryKeys.length; i < len; i++) {
-      key = queryKeys[i];
-      value = props[key];
-      this.validate(key, value) && fn(key, value);
+    var names = Object.keys(props).sort();
+    var name;
+
+    for (var i = 0, len = names.length; i < len; i++) {
+      if (!((name = names[i]) in this._params)) {
+        fn(name, props[name]);
+      }
     }
   }
 });

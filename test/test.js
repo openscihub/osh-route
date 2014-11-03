@@ -28,14 +28,14 @@ describe('Route', function() {
       ).to.be('/users/tory/articles/health');
     });
 
-    it('should return undefined on undefined param', function() {
-      expect(route.path({})).to.be(undefined);
+    it('should throw on undefined param', function() {
+      expect(route.path.bind(route, {})).to.throwException(/EBADPARAM/);
     });
 
-    it('should return undefined on invalid param', function() {
-      expect(route.path({user: 'tory', article: '!@#%^'}))
+    it('should throw on invalid param', function() {
+      expect(route.path.bind(route, {user: 'tory', article: '!@#%^'}))
       .to
-      .be(undefined);
+      .throwException(/ebadparam/i);
     });
   });
 
@@ -50,28 +50,12 @@ describe('Route', function() {
   });
 
   describe('query()', function() {
-    it('should accept good query parameter', function() {
-      var route = Route({
-        path: '/',
-        query: {
-          tab: /^[a-z]+$/
-        }
-      });
+    it('should take non-path param props', function() {
       expect(
-        route.query({tab: 'articles'})
+        route.query({user: 'tory', article: 'health', page: '1'})
       ).to.eql(
-        {tab: 'articles'}
+        {page: '1'}
       );
-    });
-
-    it('should ignore bad query parameter', function() {
-      var route = Route({
-        path: '/',
-        query: {
-          tab: /^[a-z]+$/
-        }
-      });
-      expect(route.query({tab: 'ARTICLES'})).to.eql({});
     });
   });
 

@@ -2,9 +2,8 @@
 
 A Route is basically a translator between properties and URIs. Its two most
 important functions are complementary: `route.uri(props)` and `route.props(uri)`.
-This allows you to think about URIs as a route plus a simple set of parameters.
-Route configuration also helps you couple validation code with URIs.
-
+This allows you to think about URIs as POJOs, which is what you work with in
+your scripts.
 
 ## Installation
 
@@ -20,17 +19,10 @@ Example:
 var Route = require('osh-route');
 
 var userRoute = Route({
-  method: 'GET',
   path: '/users/<user>',
   params: {
-    user: /^\w+$/
-  },
-  query: {
-    age: function(age) {
-      return /[0-9]+/.test(age);
-    }
-  },
-  strict: true
+    user: /^[a-z]+$/
+  }
 });
 ```
 
@@ -43,30 +35,27 @@ Let's use the route.
 
 ```js
 userRoute.uri({user: 'tony', age: '31'});  // '/users/tony?age=31'
-userRoute.uri({user: 'zeus', age: 'na'});  // undefined
-userRoute.path({user: 'tony', age: '31'}); // '/users/tony'
+userRoute.uri({user: 'TONY'});             // error!
 userRoute.props('/users/tony?age=31');     // {user: 'tony', age: '31'}
+userRoute.props('/users/TONY');            // undefined
+
+// Also this stuff...
+userRoute.path({user: 'tony', age: '31'}); // '/users/tony'
 userRoute.query('/users/tony?age=31');     // {age: '31'}
 userRoute.qs({user: 'tony', age: '31'});   // 'age=31'
 ```
 
 The rules for generating a URI from properties are:
 
-- If a path parameter is missing or invalid, return undefined.
-- If a query parameter is missing, exclude it from the URI.
-- If a query parameter is invalid, include it anyway.
+- If a path parameter is missing or invalid, throw an Error.
+- Any property that is not a path parameter is added to the query string.
 
-The rules for obtaining props from a URI are:
+The rules for obtaining props from a URI string are:
 
 - If the path does not match, return undefined.
-- If the path matches but the parameters are invalid, return undefined
-  and set `route.invalid`.
-- If a query parameter is missing, exclude it from the props.
-- If a query parameter is invalid, and `strict: true`, exclude it; otherwise
-  include it.
+- If the path matches, return an object with a key for every path/query
+  parameter.
 
-Therefore, the `props()` method can be used to route based on path *and*
-query.
 
 ## Configuration
 
@@ -77,11 +66,6 @@ properties:
   and should correspond with an entry in the `params` config property.
 - `params {Object}`: An object mapping parameter names (specified in the
   path template) to validation RegExps or functions.
-- `query {Object}`: (*optional*) An object mapping query string keys to
-  validation RegExps or functions. Only useful when `strict` is `true`.
-- `strict {Boolean}`: (*optional*, default: `false`) If true, invalid query
-  values are ignored. The default is `false`, which renders the `query` config
-  setting useless.
 
 ## Methods
 
@@ -90,17 +74,30 @@ properties:
 Convert a props object into a URI string. The query section is
 always ordered by query key name, so that a uri can act as a unique id.
 
+If a path parameter is missing from `props` or exists but is invalid, an
+Error is thrown. The error message is of the form
+
+```
+EBADPARAM: <param_name>
+```
+
+where `<param_name>` is the name of the infringing property.
+
 ### route.props(uri)
 
-Convert a uri string into a plain old javascript object.
+Convert a uri string into a plain old javascript object. If the path
+does not match, `undefined` is returned.
 
 ### route.path(props)
 
 Return only the path part of the given props.
+If a path parameter is missing from `props` or exists but is invalid,
+the EBADPARAM error is thrown.
 
 ### route.query(props)
 
-Return only the query part of the given props as an object.
+Return only the query part of the given props as an object. Always returns
+an object.
 
 ### route.qs(props)
 
@@ -120,7 +117,7 @@ One strategy is to use environment variables.
 ```js
 var userRoute = Route({
   host: process.env.API_HOST,
-  pattern: '/users/<user>',
+  path: '/users/<user>',
   params: {
     user: /\w+/
   }
@@ -168,7 +165,7 @@ Now I can write my Route isomorphically,
 ```js
 var userRoute = Route({
   host: require('./host'),
-  pattern: '/users/<user>',
+  path: '/users/<user>',
   params: {
     user: /\w+/
   }
