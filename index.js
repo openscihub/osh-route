@@ -1,1 +1,197 @@
-module.exports = require('./lib/server');
+var merge = require('xtend/immutable');
+var Class = require('osh-class');
+var parseUri = require('parseUri');
+
+
+// http://stackoverflow.com/questions/3561493/is-there-a-regexp-escape-function-in-javascript/3561711#3561711
+RegExp.escape = function(s) {
+  return s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+};
+
+
+var Hierarchy = Class({
+  constructor: function(opts) {
+    var Constructor = this.constructor; // Must detach Constructor from 'this'!
+    if (opts.parent) {
+      this.parent = (
+        opts.parent instanceof Constructor ?
+        opts.parent : Constructor(opts.parent)
+      );
+    }
+  }
+});
+
+
+/**
+ *  Options:
+ *    - pattern {String}: The pattern string has only one simple rule;
+ *      any sections surrounded by '<' and '>' are considered parameters and
+ *      should have a corresponding RegExp defined in the given params object.
+ *    - params {Object<String, RegExp>} (optional):
+ *    - parent {Function|Object}: If a function, we assume, it was
+ *      created by a call to Route(...). If an object, we create a Route.
+ */
+
+var Route = Class(Hierarchy, {
+  constructor: function(opts) {
+    this._super(opts);
+    var parent = this.parent || {};
+    this._path = (parent._path || '') + opts.path.replace(/\/$/, '');
+    this._params = merge(parent._params || {}, opts.params);
+    this.host = opts.host || '';
+    this._query = opts.query || {}; // Do not inherit.
+    this.queryKeys = Object.keys(this._query).sort();
+    this._compile();
+  },
+
+  _compile: function() {
+    var source = '^';
+    var parts = this._path.split(/[<>]/);
+    var paramNames = [];
+    for (var i = 0; i < parts.length; i++) {
+      part = parts[i];
+      source += (
+        i % 2 ? '(.*)' : RegExp.escape(part)
+      );
+      (i % 2) && paramNames.push(part);
+    }
+    this._paramNames = paramNames;
+    this._regexp = new RegExp(source + '/?$');
+  },
+
+  validate: function(name, value) {
+    if (value === undefined) return;
+    var validator = this._params[name] || this._query[name];
+    if (!validator) return;
+    var valid = (
+      validator instanceof RegExp ?
+      validator.test(value) :
+      validator(value)
+    );
+    if (!valid) this.invalid[name] = value;
+    return valid;
+  },
+
+
+  /**
+   *  Build the path string from parameters. If the parameters do
+   *  not fully describe the path, return undefined.
+   *
+   *  Example:
+   *    var route = Route({
+   *      path: '/users/<user>',
+   *      params: {user: /\w+/}
+   *      parent: {
+   *        path: '/api'
+   *      }
+   *    });
+   *    route.path({user: 'tory'}); // '/api/users/tory'
+   *
+   */
+    
+  path: function(props) {
+    props = props || {};
+    this.invalid = {};
+  
+    var path = this._path;
+    var name;
+    var value;
+    var regexp;
+
+    for (name in this._params) {
+      value = props[name];
+      if (this.validate(name, value)) {
+        path = path.replace(
+          new RegExp('<' + RegExp.escape(name) + '>', 'g'),
+          function() {return encodeURIComponent(value);}
+        );
+      }
+      else return;
+    }
+  
+    delete this.invalid;
+    return path;
+  },
+
+  /**
+   *  Return a uri with query parameters sorted by key for comparing
+   *  .
+   */
+  
+  uri: function(props) {
+    var path = this.path(props);
+    if (!path) return;
+    return path + this.qs(props);
+  },
+
+  query: function(props) {
+    var query = {};
+    this._iterQuery(props, function(key, value) {
+      query[key] = value;
+    });
+    return query;
+  },
+  
+  qs: function(props) {
+    var query = [];
+    this._iterQuery(props, function(key, value) {
+      query.push(
+        encodeURIComponent(key + '=' + value)
+      );
+    });
+    return (query.length ? '?' : '') + query.join('&');
+  },
+  
+  params: function(path) {
+    var match = this._regexp.exec(path);
+    if (!match) return;
+
+    this.invalid = {};
+
+    var name;
+    var value;
+    var params = {};
+    for (var i = 1, len = match.length; i < len; i++) {
+      name = this._paramNames[i - 1];
+      value = match[i];
+      if (!this.validate(name, value)) return;
+      params[name] = value;
+    }
+  
+    delete this.invalid;
+    return params;
+  },
+
+  props: function(uri) {
+    uri = parseUri(uri);
+    var params = this.params(uri.path);
+    if (!params) return;
+    return merge(params, this.query(uri.queryKeys));
+  },
+  
+  /**
+   *  Returns query object given a bunch of uri parameters. If a
+   *  parameter's name matches, but the value does not satisfy the
+   *  associated RegExp, it is not placed in the resulting query
+   *  object. Therefore, one can test a valid query parameter via:
+   *
+   *    var q = path.query({a: 'bad'});
+   *    if (!('a' in q));
+   */
+  
+  _iterQuery: function(props, fn) {
+    props = props || {};
+  
+    var queryKeys = this.queryKeys;
+    var key;
+    var value;
+  
+    for (var i = 0, len = queryKeys.length; i < len; i++) {
+      key = queryKeys[i];
+      value = props[key];
+      this.validate(key, value) && fn(key, value);
+    }
+  }
+});
+
+module.exports = Route;

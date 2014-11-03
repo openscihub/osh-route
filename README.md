@@ -1,82 +1,124 @@
-# Path
+# Route
 
-A Path is an abstraction of a uri. Path lets you make HTTP requests on the
-server or in the browser (implemented by wrapping
-[superagent](https://github.com/visionmedia/superagent)) using parameters
-rather than a string. This helps with all-important parameter validation.
+A Route is basically a translator between properties and URIs. Its two most
+important functions are complementary: `route.uri(props)` and `route.props(uri)`.
+This allows you to think about URIs as a route plus a simple set of parameters.
+Route configuration also helps you couple validation code with URIs.
 
-Also, you get parameter validation at your express server endpoints pretty
-painlessly, too.
 
 ## Installation
 
 ```
-npm install osh-path
+npm install osh-route
 ```
 
-## Narrative
+## Usage
 
 Example:
 
 ```js
-var Path = require('osh-path');
+var Route = require('osh-route');
 
-var userPath = Path({
-  pattern: '/users/<user>',
+var userRoute = Route({
+  method: 'GET',
+  path: '/users/<user>',
   params: {
-    user: /\w+/
+    user: /^\w+$/
   },
   query: {
-    age: /[0-9]+/
-  }
+    age: function(age) {
+      return /[0-9]+/.test(age);
+    }
+  },
+  strict: true
 });
 ```
 
-The `pattern` format keeps it simple; everything is literal in the string
-except for parameter names between `<` `>`. A parameter name should
-match an entry in the `params` object, which maps parameter names to
-`RegExp`s. (Yes, the express way of writing `'/users/:user'` is a nice
-shorthand, but I find that separating the RegExp for the parameter from
-the url pattern helps a lot with code reuse; e.g. web forms.)
+The `path` format keeps it simple; everything is literal in the string
+except for parameter names between `<` `>`. A parameter name should match an
+entry in the `params` object, which maps parameter names to `RegExp`s or
+validation functions.
 
-Path wraps up SuperAgent, so one can make requests from the server
-and browser.
+Let's use the route.
 
 ```js
-userPath.get({user: 'fred', age: 90})
-.end(function(res) {
-  // Check out Fred's res.body at 90...
-});
+userRoute.uri({user: 'tony', age: '31'});  // '/users/tony?age=31'
+userRoute.uri({user: 'zeus', age: 'na'});  // undefined
+userRoute.path({user: 'tony', age: '31'}); // '/users/tony'
+userRoute.props('/users/tony?age=31');     // {user: 'tony', age: '31'}
+userRoute.query('/users/tony?age=31');     // {age: '31'}
+userRoute.qs({user: 'tony', age: '31'});   // 'age=31'
 ```
 
-If the `user` param doesn't match the RegExp, the request will be avoided
-completely, and a valid 404 SuperAgent response will be returned.
+The rules for generating a URI from properties are:
 
-Path helps you serve stuff using Express. For example, using `userPath`
-from the example above:
+- If a path parameter is missing or invalid, return undefined.
+- If a query parameter is missing, exclude it from the URI.
+- If a query parameter is invalid, include it anyway.
 
-```js
-var app = express();
-userPath.serve(app, 'get', function(req, res) {
-  res.send({
-    username: req.params.user,
-    wrinkles: Number(req.params.age) * 100
-  });
-});
-```
+The rules for obtaining props from a URI are:
 
-That's basically it.
+- If the path does not match, return undefined.
+- If the path matches but the parameters are invalid, return undefined
+  and set `route.invalid`.
+- If a query parameter is missing, exclude it from the props.
+- If a query parameter is invalid, and `strict: true`, exclude it; otherwise
+  include it.
+
+Therefore, the `props()` method can be used to route based on path *and*
+query.
+
+## Configuration
+
+A Route is instantiated with a config object, that accepts the following
+properties:
+
+- `path {String}`: Path template. Parameters are specified by `<param_name>`
+  and should correspond with an entry in the `params` config property.
+- `params {Object}`: An object mapping parameter names (specified in the
+  path template) to validation RegExps or functions.
+- `query {Object}`: (*optional*) An object mapping query string keys to
+  validation RegExps or functions. Only useful when `strict` is `true`.
+- `strict {Boolean}`: (*optional*, default: `false`) If true, invalid query
+  values are ignored. The default is `false`, which renders the `query` config
+  setting useless.
+
+## Methods
+
+### route.uri(props)
+
+Convert a props object into a URI string. The query section is
+always ordered by query key name, so that a uri can act as a unique id.
+
+### route.props(uri)
+
+Convert a uri string into a plain old javascript object.
+
+### route.path(props)
+
+Return only the path part of the given props.
+
+### route.query(props)
+
+Return only the query part of the given props as an object.
+
+### route.qs(props)
+
+Return only the query part of the given props as a string.
+The string is always ordered by query key name.
+
+## Hostname
 
 One more bump in the road occurs when dealing with hostnames. Accessing your
 API from another service on your backend requires requesting a host like
 `localhost:3333` or something, whereas on the client it's something like
-`https://api.app.com`. Path doesn't really help you with this (apart from
-separating host from path), but here are some ways to deal with it.
+`https://api.app.com`. Route doesn't really help you with this (apart from
+separating host from route), but here are some ways to deal with it.
 
 One strategy is to use environment variables.
 
 ```js
-var userPath = Path({
+var userRoute = Route({
   host: process.env.API_HOST,
   pattern: '/users/<user>',
   params: {
@@ -121,10 +163,10 @@ module.exports = 'localhost:3333';
 module.exports = 'https://api.app.com/api';
 ```
 
-Now I can write my Path isomorphically,
+Now I can write my Route isomorphically,
 
 ```js
-var userPath = Path({
+var userRoute = Route({
   host: require('./host'),
   pattern: '/users/<user>',
   params: {
