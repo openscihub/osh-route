@@ -62,6 +62,7 @@ The rules for obtaining props from a URI string are:
 A Route is instantiated with a config object, that accepts the following
 properties:
 
+- `method {String}`: Either `'GET'` or `'POST'`;
 - `path {String}`: Path template. Parameters are specified by `<param_name>`
   and should correspond with an entry in the `params` config property.
 - `params {Object}`: An object mapping parameter names (specified in the

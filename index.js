@@ -36,6 +36,7 @@ var Route = Class(Hierarchy, {
   constructor: function(opts) {
     this._super(opts);
     var parent = this.parent || {};
+    this.method = opts.method || parent.method || 'GET';
     this._path = (parent._path || '') + opts.path.replace(/\/$/, '');
     this._params = merge(parent._params || {}, opts.params);
     this.host = opts.host || '';
