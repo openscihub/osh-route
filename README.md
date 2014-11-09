@@ -18,7 +18,7 @@ Example:
 ```js
 var Route = require('osh-route');
 
-var userRoute = Route({
+var userRoute = new Route({
   path: '/users/<user>',
   params: {
     user: /^[a-z]+$/

@@ -1,5 +1,5 @@
 var merge = require('xtend/immutable');
-var Class = require('osh-class');
+var extend = require('xtend/mutable');
 var parseUri = require('parseUri');
 
 
@@ -7,19 +7,6 @@ var parseUri = require('parseUri');
 RegExp.escape = function(s) {
   return s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 };
-
-
-var Hierarchy = Class({
-  constructor: function(opts) {
-    var Constructor = this.constructor; // Must detach Constructor from 'this'!
-    if (opts.parent) {
-      this.parent = (
-        opts.parent instanceof Constructor ?
-        opts.parent : Constructor(opts.parent)
-      );
-    }
-  }
-});
 
 
 /**
@@ -32,16 +19,19 @@ var Hierarchy = Class({
  *      created by a call to Route(...). If an object, we create a Route.
  */
 
-var Route = Class(Hierarchy, {
-  constructor: function(opts) {
-    this._super(opts);
-    var parent = this.parent || {};
-    this.method = opts.method || parent.method || 'GET';
-    this._path = (parent._path || '') + opts.path.replace(/\/$/, '');
-    this._params = merge(parent._params || {}, opts.params);
-    this.host = opts.host || '';
-    this._compile();
-  },
+function Route(opts) {
+  var parent = {};
+  if (opts.parent) {
+    parent = new Route(opts.parent);
+  }
+  this.method = opts.method || parent.method || 'GET';
+  this._path = (parent._path || '') + opts.path.replace(/\/$/, '');
+  this._params = merge(parent._params || {}, opts.params);
+  this.host = opts.host || '';
+  this._compile();
+}
+
+extend(Route.prototype, {
 
   _compile: function() {
     var source = '^';
@@ -136,7 +126,8 @@ var Route = Class(Hierarchy, {
     var query = [];
     this._iterQuery(props, function(key, value) {
       query.push(
-        encodeURIComponent(key + '=' + value)
+        encodeURIComponent(key) + '=' +
+        encodeURIComponent(value)
       );
     });
     return (query.length ? '?' : '') + query.join('&');

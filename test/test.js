@@ -3,7 +3,7 @@ var expect = require('expect.js');
 
 describe('Route', function() {
 
-  var route = Route({
+  var route = new Route({
     host: 'localhost:3333',
     path: '/articles/<article>',
     params: {article: /\w+/},
