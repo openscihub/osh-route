@@ -37,6 +37,27 @@ describe('Route', function() {
       .to
       .throwException(/ebadparam/i);
     });
+
+    it('should return at least /', function() {
+      var route = new Route({
+        path: ''
+      });
+      expect(route.path()).to.be('/');
+    });
+
+    it('should not repeat slashes', function() {
+      var route = new Route({
+        path: '/',
+        parent: {path: '/'}
+      });
+      expect(route.path()).to.be('/');
+
+      route = new Route({
+        path: '/slashes/',
+        parent: {path: '/slashes/'}
+      });
+      expect(route.path()).to.be('/slashes/slashes');
+    });
   });
 
   describe('props()', function() {
@@ -59,4 +80,12 @@ describe('Route', function() {
     });
   });
 
+  describe('uri()', function() {
+    it('should put the slash in', function() {
+      var route = new Route({
+        path: ''
+      });
+      expect(route.uri({hi: 'hi'})).to.be('/?hi=hi');
+    });
+  });
 });
