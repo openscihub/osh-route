@@ -1,6 +1,6 @@
 {
   "name": "osh-route",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "openscihub.org: abstract routes for clients and servers",
   "main": "index.js",
   "directories": {

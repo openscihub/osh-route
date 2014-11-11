@@ -110,7 +110,7 @@ extend(Route.prototype, {
   
   uri: function(props) {
     var path = this.path(props);
-    if (!path) return;
+    if (path === undefined) return;
     return path + this.qs(props);
   },
 
