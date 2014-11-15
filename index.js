@@ -24,7 +24,6 @@ function Route(opts) {
   if (opts.parent) {
     parent = new Route(opts.parent);
   }
-  this.method = opts.method || parent.method || 'GET';
   this._path = '/' + ((parent._path || '') + opts.path).replace(/^\/+|\/$/g, '');
   this._params = merge(parent._params || {}, opts.params);
   this.host = opts.host || '';
@@ -154,7 +153,7 @@ extend(Route.prototype, {
     uri = parseUri(uri);
     var params = this.params(uri.path);
     if (!params) return;
-    return merge(params, uri.queryKeys);
+    return merge(params, uri.queryKey);
   },
   
   /**
