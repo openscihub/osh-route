@@ -20,6 +20,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/openscihub/node-osh-route.git"
+    "url": "git://github.com/openscihub/osh-route.git"
   }
 }
