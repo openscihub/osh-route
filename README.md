@@ -28,26 +28,31 @@ var userRoute = new Route({
 
 The `path` format keeps it simple; everything is literal in the string
 except for parameter names between `<` `>`. A parameter name should match an
-entry in the `params` object, which maps parameter names to `RegExp`s or
-validation functions.
+entry in the `params` object, which maps parameter names to RegExps.
+RegExps have the following restrictions/allowances:
+
+- May start with `^` (for RegExp reuse).
+- May end with `$` (for RegExp reuse).
+- No capturing groups (if sub-parameters are needed, add another
+  `<param>` to the path template)
 
 Let's use the route.
 
 ```js
 userRoute.uri({user: 'tony', age: '31'});  // '/users/tony?age=31'
-userRoute.uri({user: 'TONY'});             // error!
+userRoute.uri({user: 'TONY'});             // undefined
 userRoute.props('/users/tony?age=31');     // {user: 'tony', age: '31'}
 userRoute.props('/users/TONY');            // undefined
 
 // Also this stuff...
 userRoute.path({user: 'tony', age: '31'}); // '/users/tony'
 userRoute.query('/users/tony?age=31');     // {age: '31'}
-userRoute.qs({user: 'tony', age: '31'});   // 'age=31'
+userRoute.qs({user: 'tony', age: '31'});   // '?age=31'
 ```
 
 The rules for generating a URI from properties are:
 
-- If a path parameter is missing or invalid, throw an Error.
+- If a path parameter is missing or invalid, return `undefined`.
 - Any property that is not a path parameter is added to the query string.
 
 The rules for obtaining props from a URI string are:
@@ -62,27 +67,27 @@ The rules for obtaining props from a URI string are:
 A Route is instantiated with a config object, that accepts the following
 properties:
 
-- `method {String}`: Either `'GET'` or `'POST'`;
 - `path {String}`: Path template. Parameters are specified by `<param_name>`
   and should correspond with an entry in the `params` config property.
 - `params {Object}`: An object mapping parameter names (specified in the
   path template) to validation RegExps or functions.
+- `parent {Object|Route}`: Route instance (or Route config object) to
+  prepend to the current Route.
 
-## Methods
+## Properties
+
+Of a Route instance.
+
+### route.PATH
+
+The path RegExp created from the template and set of parameters.
 
 ### route.uri(props)
 
 Convert a props object into a URI string. The query section is
 always ordered by query key name, so that a uri can act as a unique id.
-
-If a path parameter is missing from `props` or exists but is invalid, an
-Error is thrown. The error message is of the form
-
-```
-EBADPARAM: <param_name>
-```
-
-where `<param_name>` is the name of the infringing property.
+If a path parameter is missing from `props` or exists but is invalid,
+`undefined` is returned.
 
 ### route.props(uri)
 
@@ -93,7 +98,7 @@ does not match, `undefined` is returned.
 
 Return only the path part of the given props.
 If a path parameter is missing from `props` or exists but is invalid,
-the EBADPARAM error is thrown.
+`undefined` is returned.
 
 ### route.query(props)
 
@@ -103,7 +108,8 @@ an object.
 ### route.qs(props)
 
 Return only the query part of the given props as a string.
-The string is always ordered by query key name.
+The string is always ordered by query key name. A `?` is prepended
+if the query string is not empty.
 
 ## Hostname
 

@@ -11,7 +11,7 @@ RegExp.escape = function(s) {
 
 /**
  *  Options:
- *    - pattern {String}: The pattern string has only one simple rule;
+ *    - path {String}: The pattern string has only one simple rule;
  *      any sections surrounded by '<' and '>' are considered parameters and
  *      should have a corresponding RegExp defined in the given params object.
  *    - params {Object<String, RegExp>} (optional):
@@ -22,9 +22,9 @@ RegExp.escape = function(s) {
 function Route(opts) {
   var parent = {};
   if (opts.parent) {
-    parent = new Route(opts.parent);
+    parent = opts.parent.PATH ? opts.parent : new Route(opts.parent);
   }
-  this._path = '/' + ((parent._path || '') + opts.path).replace(/^\/+|\/$/g, '');
+  this.pattern = '/' + ((parent.pattern || '') + opts.path).replace(/^\/+|\/$/g, '');
   this._params = merge(parent._params || {}, opts.params);
   this.host = opts.host || '';
   this._compile();
@@ -34,36 +34,27 @@ extend(Route.prototype, {
 
   _compile: function() {
     var source = '^';
-    var parts = this._path.split(/[<>]/);
     var paramNames = [];
+    var parts = this._parts = this.pattern.split(/[<>]/);
     for (var i = 0; i < parts.length; i++) {
       part = parts[i];
       source += (
-        i % 2 ? '(.*)' : RegExp.escape(part)
+        i % 2 ?
+        // Enforces that param RegExp exists on Route creation.
+        '(' + this._params[part].source.replace(/^\^/, '').replace(/\$$/, '') + ')' :
+        RegExp.escape(part)
       );
       (i % 2) && paramNames.push(part);
     }
     this._paramNames = paramNames;
-    this._regexp = new RegExp(source + '/?$');
-  },
-
-  validate: function(name, value) {
-    if (value === undefined) return;
-    var validator = this._params[name];
-    if (!validator) return;
-    var valid = (
-      validator instanceof RegExp ?
-      validator.test(value) :
-      validator(value)
-    );
-    return valid;
+    this.PATH = new RegExp(source + '/?$');
   },
 
 
   /*\
    *
    *  Build the path string from parameters. If the parameters do
-   *  not fully describe the path, throw an error.
+   *  not fully describe the path, return undefined.
    *
    *  Example:
    *
@@ -81,24 +72,22 @@ extend(Route.prototype, {
   path: function(props) {
     props = props || {};
   
-    var path = this._path;
-    var name;
+    var path = '';
+    var part;
     var value;
-    var regexp;
 
-    for (name in this._params) {
-      value = props[name];
-      if (this.validate(name, value)) {
-        path = path.replace(
-          new RegExp('<' + RegExp.escape(name) + '>', 'g'),
-          function() {return encodeURIComponent(value);}
-        );
+    for (var i = 0, len = this._parts.length; i < len; i++) {
+      part = this._parts[i];
+      if (i % 2) {
+        value = props[part];
+        // RegExp in this._params is guaranteed to exist at this point.
+        // See _compile() method comments.
+        if (!value || !this._params[part].test(value)) return;
+        path += encodeURIComponent(value);
       }
-      else {
-        throw new Error('EBADPARAM: ' + name);
-      }
+      else path += part;
     }
-  
+
     return path;
   },
 
@@ -133,17 +122,14 @@ extend(Route.prototype, {
   },
   
   params: function(path) {
-    var match = this._regexp.exec(path);
+    var match = this.PATH.exec(path);
     if (!match) return;
 
     var name;
-    var value;
     var params = {};
     for (var i = 1, len = match.length; i < len; i++) {
       name = this._paramNames[i - 1];
-      value = match[i];
-      if (!this.validate(name, value)) return;
-      params[name] = value;
+      params[name] = match[i];
     }
   
     return params;
@@ -172,9 +158,7 @@ extend(Route.prototype, {
     var name;
 
     for (var i = 0, len = names.length; i < len; i++) {
-      if (!((name = names[i]) in this._params)) {
-        fn(name, props[name]);
-      }
+      !((name = names[i]) in this._params) && fn(name, props[name]);
     }
   }
 });

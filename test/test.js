@@ -7,7 +7,6 @@ describe('Route', function() {
     host: 'localhost:3333',
     path: '/articles/<article>',
     params: {article: /\w+/},
-    get: true,
     parent: {
       path: '/users/<user>',
       params: {user: /[^\/]+/},
@@ -16,6 +15,13 @@ describe('Route', function() {
         params: {}
       }
     }
+  });
+
+  describe('PATH', function() {
+    it('should be the right RegExp', function() {
+      expect('/users/tory/articles/article').to.match(route.PATH);
+      expect('/users/tory/articles/article/').to.match(route.PATH);
+    });
   });
 
   describe('path()', function() {
@@ -28,14 +34,13 @@ describe('Route', function() {
       ).to.be('/users/tory/articles/health');
     });
 
-    it('should throw on undefined param', function() {
-      expect(route.path.bind(route, {})).to.throwException(/EBADPARAM/);
+    it('should return undefined on undefined param', function() {
+      expect(route.path({})).to.be(undefined);
     });
 
-    it('should throw on invalid param', function() {
-      expect(route.path.bind(route, {user: 'tory', article: '!@#%^'}))
-      .to
-      .throwException(/ebadparam/i);
+    it('should return undefined on invalid param', function() {
+      expect(route.path({user: 'tory', article: '!@#%^'}))
+      .to.be(undefined);
     });
 
     it('should return at least /', function() {
