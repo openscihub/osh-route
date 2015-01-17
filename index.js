@@ -58,7 +58,7 @@ extend(Route.prototype, {
    *
    *  Example:
    *
-   *    var route = Route({
+   *    var route = new Route({
    *      path: '/users/<user>',
    *      params: {user: /\w+/}
    *      parent: {
@@ -92,8 +92,7 @@ extend(Route.prototype, {
   },
 
   /**
-   *  Return a uri with query parameters sorted by key for comparing
-   *  .
+   *  Return a uri with query parameters sorted by key.
    */
   
   uri: function(props) {
@@ -129,7 +128,7 @@ extend(Route.prototype, {
     var params = {};
     for (var i = 1, len = match.length; i < len; i++) {
       name = this._paramNames[i - 1];
-      params[name] = match[i];
+      params[name] = decodeURIComponent(match[i]);
     }
   
     return params;
@@ -139,19 +138,16 @@ extend(Route.prototype, {
     uri = parseUri(uri);
     var params = this.params(uri.path);
     if (!params) return;
-    return merge(params, uri.queryKey);
+    for (var name in uri.queryKey) {
+      params[decodeURIComponent(name)] = decodeURIComponent(uri.queryKey[name]);
+    }
+    return params;
   },
-  
+
   /**
-   *  Returns query object given a bunch of uri parameters. If a
-   *  parameter's name matches, but the value does not satisfy the
-   *  associated RegExp, it is not placed in the resulting query
-   *  object. Therefore, one can test a valid query parameter via:
-   *
-   *    var q = path.query({a: 'bad'});
-   *    if (!('a' in q));
+   *  Apply fn over the query string pairs in sorted order by key.
    */
-  
+
   _iterQuery: function(props, fn) {
     props = props || {};
     var names = Object.keys(props).sort();
